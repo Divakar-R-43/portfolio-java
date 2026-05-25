@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript Logic & State Management - To-Do List</title>
+    <style>
+        /* --- CSS STYLING --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .todo-container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            width: 400px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+        }
+
+        #todo-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #todo-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        #add-btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #add-btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        .filter-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            flex: 1;
+            background: none;
+            border: 1px solid #ddd;
+            padding: 8px;
+            cursor: pointer;
+            background-color: #f8fafc;
+            color: #64748b;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:first-child { border-radius: 6px 0 0 6px; }
+        .filter-btn:last-child { border-radius: 0 6px 6px 0; }
+
+        .filter-btn.active {
+            background-color: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        #todo-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .todo-item.completed span {
+            text-decoration: line-through;
+            color: #94a3b8;
+        }
+
+        .todo-text {
+            flex: 1;
+            margin-left: 10px;
+            font-size: 15px;
+        }
+
+        .edit-input {
+            flex: 1;
+            margin-left: 10px;
+            padding: 4px;
+            font-size: 15px;
+        }
+
+        .action-btns button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            margin-left: 5px;
+            font-size: 14px;
+        }
+
+        .edit-btn { color: #eab308; }
+        .delete-btn { color: #ef4444; }
+        .save-btn { color: #22c55e; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="todo-container">
+        <h2>Task Manager</h2>
+        
+        <form id="todo-form">
+            <input type="text" id="todo-input" placeholder="Add a new task..." required>
+            <button type="submit" id="add-btn">Add Task</button>
+        </form>
+
+        <div class="filter-container">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="active">Active</button>
+            <button class="filter-btn" data-filter="completed">Completed</button>
+        </div>
+
+        <ul id="todo-list"></ul>
+    </div>
+
+    <script>
+        // --- JAVASCRIPT LOGIC & STATE MANAGEMENT ---
+
+        // Local Storage-le irunthu data-va edukkirom
+        let todos = JSON.parse(localStorage.getItem('todos')) || [];
+        let currentFilter = 'all';
+
+        // DOM Elements
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+        const todoList = document.getElementById('todo-list');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+
+        // State-ai local storage-il semikka
+        function saveToLocalStorage() {
+            localStorage.setItem('todos', JSON.stringify(todos));
+        }
+
+        // To-Do list-ai thirayil kaanbikka (Render)
+        function renderTodos() {
+            todoList.innerHTML = '';
+
+            // Filtering Logic
+            const filteredTodos = todos.filter(todo => {
+                if (currentFilter === 'active') return !todo.completed;
+                if (currentFilter === 'completed') return todo.completed;
+                return true; 
+            });
+
+            // Dynamic DOM Elements uruvaakuthal
+            filteredTodos.forEach(todo => {
+                const li = document.createElement('li');
+                li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+                li.dataset.id = todo.id;
+
+                li.innerHTML = `
+                    <input type="checkbox" class="toggle-checkbox" ${todo.completed ? 'checked' : ''}>
+                    ${todo.isEditing 
+                        ? `<input type="text" class="edit-input" value="${todo.text}">`
+                        : `<span class="todo-text">${todo.text}</span>`
+                    }
+                    <div class="action-btns">
+                        ${todo.isEditing 
+                            ? `<button class="save-btn">💾</button>` 
+                            : `<button class="edit-btn">✏️</button>`
+                        }
+                        <button class="delete-btn">❌</button>
+                    </div>
+                `;
+                todoList.appendChild(li);
+            });
+        }
+
+        // CREATE: Puthu task add seiya
+        todoForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = todoInput.value.trim();
+            if (!text) return;
+
+            const newTodo = {
+                id: Date.now().toString(),
+                text: text,
+                completed: false,
+                isEditing: false
+            };
+
+            todos.push(newTodo);
+            saveToLocalStorage();
+            renderTodos();
+            todoInput.value = '';
+        });
+
+        // DELEGATED EVENT LISTENERS: List-il ulla clicks-ai handle seiya (Update & Delete)
+        todoList.addEventListener('click', (e) => {
+            const target = e.target;
+            const li = target.closest('.todo-item');
+            if (!li) return;
+            const id = li.dataset.id;
+
+            // UPDATE: Task-ai complete status-uku maatra
+            if (target.classList.contains('toggle-checkbox')) {
+                todos = todos.map(todo => todo.id === id ? { ...todo, completed: target.checked } : todo);
+            }
+
+            // UPDATE: Edit mode-ai on seiya
+            if (target.classList.contains('edit-btn')) {
+                todos = todos.map(todo => todo.id === id ? { ...todo, isEditing: true } : todo);
+            }
+
+            // UPDATE: Edits-ai save seiya
+            if (target.classList.contains('save-btn')) {
+                const editInput = li.querySelector('.edit-input');
+                const updatedText = editInput.value.trim();
+                if (updatedText) {
+                    todos = todos.map(todo => todo.id === id ? { ...todo, text: updatedText, isEditing: false } : todo);
+                }
+            }
+
+            // DELETE: Task-ai azhikka
+            if (target.classList.contains('delete-btn')) {
+                todos = todos.filter(todo => todo.id !== id);
+            }
+
+            saveToLocalStorage();
+            renderTodos();
+        });
+
+        // FILTER BUTTONS: All, Active, Completed button click handlers
+        filterButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+
+                currentFilter = e.target.dataset.filter;
+                renderTodos();
+            });
+        });
+
+        // Initial render on page load
+        renderTodos();
+    </script>
+</body>
+</html>
